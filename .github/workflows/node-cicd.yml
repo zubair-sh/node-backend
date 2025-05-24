@@ -1,0 +1,51 @@
+name: Node.js CI - Prod
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  build:
+    runs-on: prod
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+
+    steps:
+      - name: Stop App (if exists)
+        run: |
+          if pm2 list | grep -q "app"; then
+            pm2 stop app
+          else
+            echo "App not running yet"
+          fi
+
+      - name: Disable Husky Hooks (if repo exists)
+        run: |
+          if [ -d ".git" ]; then
+            git config core.hooksPath /dev/null
+          fi
+
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set Up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'yarn'
+
+      - name: Install Dependencies
+        run: yarn install
+
+      - name: Compile Code
+        run: yarn compile
+
+      - name: Restart or Start App
+        run: |
+          if pm2 list | grep -q "app"; then
+            pm2 restart app
+          else
+            pm2 start ecosystem.config.js --only app
+          fi
